@@ -1,5 +1,6 @@
 import argparse
 
+import spacy
 from elasticsearch import Elasticsearch
 
 
@@ -9,27 +10,53 @@ def search_entities(index_name, es):
 
     :param index_name: ElasticSearch index file
     :param es: ElasticSearch object
-    :return: Array<str>
+    :return: Dict<name:str, count:int>
     """
-    entities = []
+    entities = {}
     total_docs = get_number_docs(index_name, es)
     for i in range(1, total_docs):
         text = get_text(index_name, es, i)
-        if i < 15:
-            print(text)
+        print("Searching entities in text: " + str(i))
+        nlp = spacy.load("en_core_sci_sm")
+        doc = nlp(text)
+        for entity in doc.ents:
+            entity = str(entity)
+            if entity not in entities:
+                entities[entity] = get_term_apparitions(index_name, es, entity)
     return entities
 
 
-def get_text(index_name, es, id):
+def get_text(index_name, es, text_id):
     """ Return a text in ElasticSearch with the param id
 
     :param index_name: ElasticSearch index file
     :param es: ElasticSearch object
-    :param id: Text id
+    :param text_id: Text id
     :return: str
     """
-    res = es.get(index=index_name, id=id)
+    res = es.get(index=index_name, id=text_id)
     return res['_source']['text']
+
+
+def get_term_apparitions(index_name, es, term):
+    """ Return a text in ElasticSearch with the param id
+
+    :param index_name: ElasticSearch index file
+    :param es: ElasticSearch object
+    :param term: Term (Entity) to search
+    :return: str
+    """
+    res = es.count(index=index_name, body={
+        "query": {
+            "match": {
+                "text": {
+                    "query": term,
+                    "operator": "and"
+                }
+            }
+        }
+    })
+    return res['count']
 
 
 def get_number_docs(index_name, es):
@@ -46,7 +73,7 @@ def get_number_docs(index_name, es):
 # ========  Main  ===================
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='COVID 19 Symptom Search')
+    parser = argparse.ArgumentParser(description='COVID 19 Entity Recognition')
     parser.add_argument("-n", "--name", help="Index name")
     parser.add_argument("--host", help="ElasticSearch Adress", required=True)
     args = parser.parse_args()
@@ -57,7 +84,9 @@ def main(args) -> None:
     name = args.name if args.name is not None else "covid19-index"
     es = Elasticsearch(hosts=[args.host])
     entities = search_entities(name, es)
-    print(entities)
+    with open('entities.txt', 'w', encoding="utf8") as f:
+        for entity in sorted(entities, key=lambda x: entities[x], reverse=True):
+            f.write("{},{}\n".format(entity, entities[entity]))
 
 
 if __name__ == '__main__':

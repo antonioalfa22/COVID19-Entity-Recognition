@@ -3,6 +3,7 @@ covid19_dataset/
 share/elasticsearch/data/nodes/
 .vscode/
 .idea/
+SNOMED_CF.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

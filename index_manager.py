@@ -12,6 +12,9 @@ def create_index(name, es):
     :param es: Elastic search object
     """
     es.indices.create(index=name, ignore=400)
+    indices = es.indices.get_alias().keys()
+    print("Added index: " + name)
+    print("--> Existing indexes: " + str(indices))
 
 
 def remove_index(name, es):
@@ -22,7 +25,7 @@ def remove_index(name, es):
     es.indices.delete(index=name, ignore=[400, 404])
     indices = es.indices.get_alias().keys()
     print("Remove index: " + name)
-    print("--> Existing indexes: " + indices)
+    print("--> Existing indexes: " + str(indices))
 
 
 def index_dataset(name, directory, es):
@@ -47,14 +50,14 @@ def index_dataset(name, directory, es):
         }
         es.index(index=name, ignore=400, doc_type='docket',
                  id=i, body=json.dumps(value))
-        print("They've already been indexed " + i + " texts")
+        print("They've already been indexed " + str(i) + " texts")
         i = i + 1
 
 
 # ========  Main  ===================
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='COVID 19 Symptom Search')
+    parser = argparse.ArgumentParser(description='COVID 19 Entity Recognition')
     parser.add_argument("-n", "--name", help="Index name")
     parser.add_argument("-d", "--dataset", help="COVID 19 Dataset folder location")
     parser.add_argument("-r", "--remove", help="Delete Index", action="store_true")
