@@ -1,3 +1,8 @@
+# COVID-19
+covid19_dataset/
+.vscode/
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
