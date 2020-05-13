@@ -1,5 +1,6 @@
 # COVID-19
 covid19_dataset/
+share/elasticsearch/data/nodes/
 .vscode/
 .idea/
 
