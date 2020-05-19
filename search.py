@@ -4,6 +4,7 @@ import csv
 
 import pandas as pd
 from multiprocessing import Pool
+from difflib import SequenceMatcher
 
 
 # ========  Entities  ===============
@@ -17,7 +18,7 @@ def get_entities(entities_file):
     with open(entities_file, encoding='utf8') as ds1_file:
         csv_reader = csv.reader(ds1_file, delimiter=',')
         for row in csv_reader:
-            entities.append([str(row[0]), int(row[1])])
+            entities.append([str(row[0]), row[1]])
     return entities
 
 
@@ -29,10 +30,18 @@ def search_symptoms(entities_file, clases):
     :param clases: Symptoms SNOMED_CF
     """
     entities = get_entities(entities_file)
-    symptoms = list(filter(lambda x: x[0] in clases, entities))
-    with open('entities.txt', 'w') as f:
+    print(clases)
+    symptoms = list(filter(lambda x: is_symptom(x[0], clases), entities))
+    with open('symptoms.csv', 'w') as f:
         for symptom in sorted(symptoms, key=lambda x: x[0], reverse=True):
             f.write("{},{}\n".format(symptom[0], symptom[1]))
+
+
+def is_symptom(term, symptoms):
+    for symptom in symptoms:
+        if similar(term, symptom) > 0.8:
+            print("Syntoma: ", term)
+            return True
 
 
 # ========  Medications  ============
@@ -76,7 +85,8 @@ def search_wikidata_results(termino):
     if req.status_code == 200:
         response_terms = req.json()['search']
         for item in response_terms:
-            resultados.append(item)
+            if similar(termino, item['label']) > 0.7:
+                resultados.append(item)
     return resultados
 
 
@@ -97,6 +107,10 @@ def check_if_medication(termino):
         except:
             return None
 
+
+
+def similar(a, b):
+    return SequenceMatcher(None, a, b).ratio()
 
 # ========  SNOMED  =================
 

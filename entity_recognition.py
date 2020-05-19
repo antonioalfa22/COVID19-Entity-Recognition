@@ -20,10 +20,18 @@ def search_entities(index_name, es):
         nlp = spacy.load("en_core_sci_sm")
         doc = nlp(text)
         for entity in doc.ents:
-            entity = str(entity)
-            if entity not in entities:
+            entity = str(entity).lower()
+            entity = clean_text(entity)
+            if entity not in entities and len(entity) > 3:
                 entities[entity] = get_term_apparitions(index_name, es, entity)
     return entities
+
+
+def clean_text(texto):
+    text = texto
+    text = text.replace(" ", "").replace("(", "").replace(")", "").replace("{", "").replace("}",
+        "").replace("*","").replace(",", "").replace(".", "").replace(">", "").replace("<", "")
+    return text
 
 
 def get_text(index_name, es, text_id):
