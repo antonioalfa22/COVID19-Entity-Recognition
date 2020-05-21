@@ -58,7 +58,7 @@ def index_dataset(name, directory, es):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='COVID 19 Entity Recognition')
-    parser.add_argument("-n", "--name", help="Index name")
+    parser.add_argument("-n", "--name", help="COVID 19 Index name")
     parser.add_argument("-d", "--dataset", help="COVID 19 Dataset folder location")
     parser.add_argument("-r", "--remove", help="Delete Index", action="store_true")
     parser.add_argument("-c", "--create", help="Create Index", action="store_true")
@@ -78,6 +78,7 @@ def main(args) -> None:
     if remove:
         remove_index(name, es)
     if dataset_folder is not None:
+        print("Indexing COVID19 dataset")
         index_dataset(name, dataset_folder, es)
 
 

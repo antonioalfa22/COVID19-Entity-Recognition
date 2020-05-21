@@ -1,10 +1,9 @@
 import argparse
-import requests
 import csv
+import requests
 
-import pandas as pd
-from multiprocessing import Pool
 from difflib import SequenceMatcher
+from multiprocessing import Pool
 
 
 # ========  Entities  ===============
@@ -23,26 +22,50 @@ def get_entities(entities_file):
 
 
 # ========  Symptoms  ===============
-def search_symptoms(entities_file, clases):
-    """Search symptoms in entities with Wikidata
+def search_symptoms(entities_file):
+    """Search symptoms in entities
 
     :param entities_file: Entities file
-    :param clases: Symptoms SNOMED_CF
     """
-    entities = get_entities(entities_file)
-    print(clases)
-    symptoms = list(filter(lambda x: is_symptom(x[0], clases), entities))
-    with open('symptoms.csv', 'w') as f:
-        for symptom in sorted(symptoms, key=lambda x: x[0], reverse=True):
-            f.write("{},{}\n".format(symptom[0], symptom[1]))
+    symptoms = []
+    terminos = get_entities(entities_file)
 
+    pool = Pool(8)
+    len_terminos = len(terminos)
+    i = 0
 
-def is_symptom(term, symptoms):
-    for symptom in symptoms:
-        if similar(term, symptom) > 0.8:
-            print("Syntoma: ", term)
-            return True
+    for term in terminos:
+        i += 1
+        print(str((i / len_terminos) * 100) + '%')
+        termino = term[0]
+        apariciones = term[1]
+        resultados = search_wikidata_results(termino)
+        temp = pool.map(check_if_symptom, resultados)
+        for med in temp:
+            if med is not None:
+                symptoms.append([termino, med, apariciones])
+    print("=" * 80)
+    pool.close()
+    with open('symptoms.csv', "w", encoding="utf8") as f:
+        for medic in symptoms:
+            f.write("{},{},{}\n".format(medic[0], medic[1], medic[2]))
 
+def check_if_symptom(termino):
+    term_id = termino['id']
+    url_search = "https://www.wikidata.org/w/api.php?action=wbgetentities&ids={}&languages=en&format=json".format(
+        term_id)
+    req = requests.get(url=url_search)
+    medication_id = 'Q169872'
+    if req.status_code == 200:
+        try:
+            possible_med_id = \
+                req.json()['entities'][term_id]['claims']['P31'][0]['mainsnak']['datavalue']['value']['id']
+            if possible_med_id == medication_id:
+                return termino['label']
+            else:
+                return None
+        except:
+            return None
 
 # ========  Medications  ============
 def search_medications(entities_file):
@@ -53,7 +76,7 @@ def search_medications(entities_file):
     medicamentos = []
     terminos = get_entities(entities_file)
 
-    pool = Pool(4)
+    pool = Pool(8)
     len_terminos = len(terminos)
     i = 0
 
@@ -68,26 +91,10 @@ def search_medications(entities_file):
             if med is not None:
                 medicamentos.append([termino, med, apariciones])
     print("=" * 80)
+    pool.close()
     with open('medications.csv', "w", encoding="utf8") as f:
         for medic in medicamentos:
             f.write("{},{},{}\n".format(medic[0], medic[1], medic[2]))
-
-
-def search_wikidata_results(termino):
-    """Devuelve un array con los IDs de Wikidata de los resultados de la busqueda
-    :param termino: str
-    :return: str[]
-    """
-    resultados = []
-    url_search = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={}&language=en&format=json".format(
-        termino)
-    req = requests.get(url=url_search)
-    if req.status_code == 200:
-        response_terms = req.json()['search']
-        for item in response_terms:
-            if similar(termino, item['label']) > 0.7:
-                resultados.append(item)
-    return resultados
 
 
 def check_if_medication(termino):
@@ -108,23 +115,28 @@ def check_if_medication(termino):
             return None
 
 
+# ========== Wikidata ================
+def search_wikidata_results(termino):
+    """Devuelve un array con los IDs de Wikidata de los resultados de la busqueda
+    :param termino: str
+    :return: str[]
+    """
+    resultados = []
+    url_search = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={}&language=en&format=json".format(
+        termino)
+    req = requests.get(url=url_search)
+    if req.status_code == 200:
+        try:
+            response_terms = req.json()['search']
+            for item in response_terms:
+                if similar(termino, item['label']) > 0.5:
+                    resultados.append(item)
+        except:
+            return resultados
+    return resultados
 
 def similar(a, b):
     return SequenceMatcher(None, a, b).ratio()
-
-# ========  SNOMED  =================
-
-def get_snomed_classes(file):
-    """Devuelve un array de terminos (clases)
-    :param file: str
-    :return: Array<str>
-    """
-    classes = []
-    snomed_df = pd.read_csv(file, low_memory=False).astype(str)
-    for clase in snomed_df.itertuples():
-        classes.append(clase[2])
-    return classes
-
 
 
 # ========  Main  ===================
@@ -133,8 +145,6 @@ def parse_args():
     parser.add_argument("entities", help="Entities")
     parser.add_argument("-s", "--symptoms", help="Search symptoms", action="store_true")
     parser.add_argument("-m", "--medications", help="Search medications", action="store_true")
-    parser.add_argument("-o", "--ontology", help="SNOMED_CF Ontology csv")
-
     args = parser.parse_args()
     return args
 
@@ -143,10 +153,8 @@ def main(args) -> None:
     symptoms = args.symptoms
     medications = args.medications
     entities = args.entities
-    snomed_file = args.ontology if args.ontology is not None else "SNOMED_CF.csv"
-    clases = get_snomed_classes(snomed_file)
     if symptoms:
-        search_symptoms(entities, clases)
+        search_symptoms(entities)
     if medications:
         search_medications(entities)
 
